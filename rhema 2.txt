@@ -1,0 +1,294 @@
+//Online Store Order Analysis
+// building a small Order Analysis System for an online store. The backend receives a list of orders and must return a summary report. 
+
+SET orders = [
+  {customer: "Aisha",  product: "Keyboard",   amount: 250,  category: "Electronics"},
+  {customer: "Budi",   product: "Notebook",   amount: 35,   category: "Stationery"},
+  {customer: "Aisha",  product: "Mouse",      amount: 90,   category: "Electronics"},
+  {customer: "Citra",  product: "Monitor",    amount: 1200, category: "Electronics"},
+  {customer: "Budi",   product: "Pen Set",    amount: 15,   category: "Stationery"},
+  {customer: "Dewi",   product: "Desk Lamp",  amount: 75,   category: "Home"},
+  {customer: "Citra",  product: "Chair",      amount: 320,  category: "Home"},
+  {customer: "Aisha",  product: "USB Cable",  amount: 20,   category: "Electronics"},
+  {customer: "Eko",    product: "Marker",     amount: 8,    category: "Stationery"},
+  {customer: "Dewi",   product: "Headphones", amount: 180,  category: "Electronics"}
+]
+
+
+
+//filter - Produce a list of all orders with amount >= 50, su=ignificant or unsignificant.
+FUNCTION filterProductByAmount(orders, threshold=50):   //threshold set to default 50
+    
+    SET significantResults = []      //variable to contain the significant order
+    SET unsignificantResults = []    //variable to contain the unsignificant order (just in case if there is data that nee improvement)
+    
+    //add value into the right variable filter
+    FOR EACH order IN orders:        
+        IF order.amount >= threshold THEN
+            ADD order TO significantResults
+        ELSE
+            ADD order TO unsignificantResults 
+        END IF
+    END FOR
+
+    RETURN {   //return 2 value that contein list of significant and unsignificant orders
+        significantOrders: significantResults,
+        unsignificantOrders: unsignificantResults
+        }
+END FUNCTION
+
+//revenue summary - aggregate (total, average amount, highest and lowest)
+FUNCTION getDataAggregateOrders(orders):
+    SET n = LENGTH(orders)
+
+    //sum total revenue 
+    SET total = 0
+    FOR EACH order IN orders:
+        SET total = total + order.amount
+    END FOR
+        
+    //calculate average of order amount
+    SET average = total / n
+    SET average = ROUND(average, 2)    
+    
+    //search max and min value
+    SET maxValue = orders[0].amount
+    SET maxProduct = null
+    SET minValue = orders[0].amount
+    SET maxProduct = null
+    FOR EACH order IN orders:
+        IF order.amount > maxValue THEN
+            SET maxValue = order.amount
+            SET maxProduct = order.product
+        END IF
+    END FOR
+    FOR EACH order IN orders:
+        IF order.amount < minValue THEN
+            SET minValue = order.amount
+            SET minProduct = order.product
+        END IF
+    END FOR
+    
+    RETURN {            //return 6 value : total, average, highest amount - product, lowest amount - product
+        totalRevenue: total,
+        averagerOrderAmount: average,
+        highestOrderAmount: maxValue,
+        lowestOrderAmount: minValue,
+        productHighestOrders: maxProduct,
+        productLowestOrders: minProduct
+        }
+END FUNCTION
+
+//group & count - per category
+FUNCTION getDataGroupByCategory(orders):
+    SET groups = {}
+    SET counts = {}
+    
+    //iteration for grouping by category and counting
+    FOR EACH order IN orders:
+        IF NOT order.category IN groups THEN
+            SET groups[order.category] = []   
+            SET counts[order.category] = 1   
+        ELSE
+            ADD order TO groups[order.category]
+            SET counts[order.category] = counts[order.category] + 1   
+        END IF
+    END FOR
+    
+    //iteration for summary of total revenue each category
+    SET totalRevenueEachCategory = {}
+    FOR EACH item IN groups:
+        SET total = 0
+        SET group = groups[item]
+        FOR i FROM 0 TO LENGTH(group)-1:
+            SET total = total + group[i].amount
+        END FOR
+        SET totalRevenueEachCategory[item] = total
+    END FOR
+      
+    RETURN {        //return 3 results contain groups, counts, and total Revenue each category
+            groups: groups,
+            counts: counts,
+            total: totalRevenueEachCategory
+            }
+END FUNCTION
+
+//function for customer lookup - search
+FUNCTION findOrdersByCustomer(orders, name):
+    SET results = []
+    SET target = LOWER(name)
+    
+    //search target
+    FOR EACH order IN orders:
+        IF target == LOWER(order.customer) THEN
+            ADD order TO results
+        END IF
+    END FOR
+    
+    //print result in case user need to just search data customers, so it just can use this function
+    IF LENGTH(results) == 0 THEN
+        PRINT "============ DATA CUSTOMER ============"
+        PRINT "-------------- Not Found --------------"
+    ELSE
+        PRINT "============ DATA CUSTOMER ============"
+        PRINT "------------- ORDER FOUND -------------"
+        PRINT ""
+        PRINT "------ Here yours data for " + UPPER(target) + " ------"
+        SET total = 0
+        FOR EACH item IN results:
+            SET total = total + item.amount
+            PRINT "- Order: " + item.product + " (" + item.category + ") -> Amount : " + item.amount
+        END FOR
+        PRINT "" 
+        PRINT "------ TOTAL ORDERS AMOUNT : " + total + " ------"
+    END IF
+    RETURN
+END FUNCTION
+
+//selection sorting, descending is default
+FUNCTION selectionSorting(orders, descending = true)
+    SET n = LENGTH(orders)
+    FOR i FROM 0 TO n-2:
+        SET targetIndex = i
+        FOR j FROM i+1 TO n-1:
+            IF descending THEN
+                IF orders[j].amount > orders[targetIndex].amount THEN
+                    SET targetIndex = j
+                END IF
+            ELSE
+                IF orders[j].amount < orders[targetIndex].amount THEN
+                    SET targetIndex = j
+                END IF
+            END IF
+        END FOR
+        IF targetIndex != i THEN
+            SET temp = orders[i]
+            SET orders[i] = orders[targetIndex]
+            SET orders[targetIndex] = temp
+        END IF
+    END FOR
+    RETURN orders
+END FUNCTION
+
+//Top customers — sort. Include total amount spent by each customers, sort from highest t lowest
+FUNCTION getTopCustomers(orders):
+    //grouping and count the total amount spent by each customers
+    SET groups = {}
+    FOR EACH order IN orders:
+        SET nameCustomer = order.customer
+        IF nameCustomer EXISTS IN groups THEN
+            SET groups[nameCustomer] = groups[nameCustomer] + order.amount
+        ELSE
+            SET groups[nameCustomer] = order.amount
+        END IF
+    END FOR
+    
+    //turn from dictionary into list
+    SET listCustomers = []
+    FOR EACH item IN groups:
+        SET amount = groups[item]
+        ADD {customer: item, amount: amount} TO listCustomers
+    END FOR
+    
+    //sorting the list with selection-sorting's function
+    SET sortedListCustomers = selectionSorting(listCustomers)
+    RETURN sortedListCustomers
+END FUNCTION
+
+//Combine & report. This function help to get all data of order analysis
+FUNCTION getPrintData(orders):
+    SET filtered = filterProductByAmount(orders)
+    SET significantResults = filtered.significantOrders
+    SET unsignificantResults = filtered.unsignificantOrders
+    IF LENGTH(significantResults) == 0 THEN
+        PRINT "========== !!ATTENTION!! ============"
+        PRINT "----  All orders under threshold ----"
+        SET num = 0
+        FOR EACH item IN unsignificantResults:
+            SET num = num + 1
+            PRINT num + ". " + item.customer + " -> Product: " + item.product + " | Category: " + item.category + " --> Amount: " + item.amount
+        END FOR
+    ELSE
+        PRINT "========= Significant Orders ==========="
+        PRINT "--------- Filtered List Orders ---------"
+        SET num = 0
+        FOR EACH item IN significantResults:
+            SET num = num + 1
+            PRINT num + ". " + item.customer + " -> Product: " + item.product + " | Category: " + item.category + " --> Amount: " + item.amount
+        END FOR
+    END IF
+    
+    PRINT ""
+    PRINT ""
+        
+    SET dataAggregate = getDataAggregateOrders(orders)
+    SET totalRevenue = dataAggregate.totalRevenue
+    SET averagerAmount = dataAggregate.averagerOrderAmount        
+    SET highestAmount = dataAggregate.highestOrderAmount
+    SET lowestAmount = dataAggregate.lowestOrderAmount
+    SET productHighest= dataAggregate.productHighestOrders
+    SET productLowest = dataAggregate.productLowestOrders
+        
+        
+    PRINT "========= REVENUE SUMMARY ==========="
+    PRINT ""
+    PRINT "Total Revenue: " + totalRevenue 
+    PRINT "Average Order Amount: " + averagerAmount 
+    PRINT "Highest Order Amounts: " + highestAmount + " ---> Products: " + productHighest        
+    PRINT "Lowest Order Amounts: " + lowestAmount + " ---> Products: " + productLowest 
+       
+    PRINT ""
+    PRINT ""
+        
+    SET dataGroupByCategory = getDataGroupByCategory(orders)
+    SET groupsByCategory =  dataGroupByCategory.groups
+    SET countsEachCategory =  dataGroupByCategory.counts
+    SET totalRevenueEachCategory = dataGroupByCategory.total
+    PRINT "===== DATA ORDERS PER CATEGORY ====="
+    PRINT ""
+    SET num = 0
+    FOR EACH item IN groupsByCategory:
+        SET totalAmount = totalRevenueEachCategory[item]
+        SET countsCategory = countsEachCategory[item]
+        SET num = num + 1
+        PRINT num + ". " + item + " -> Total Orders: " + countsCategory + " | Total Revenue: " +  totalAmount
+    END FOR 
+        
+    PRINT ""
+    PRINT ""
+        
+    SET sortedCustomers = getTopCustomers(orders)
+    PRINT "============== TOP CUSTOMERS =============="
+    PRINT ""
+    SET iconRanks = ["🥇" , "🥈" , "🥉"]
+    FOR i FROM 0 TO 2:
+        SET num = i + 1
+        PRINT "---- RANK " + num + " - " + UPPER(sortedCustomers[i].customer) + " " + iconRanks[i] + " -> TOTAL AMOUNT: " + sortedCustomers[i].amount  
+    END FOR
+    PRINT "--------------------------------------------"
+    PRINT "========== Sorted LIST Customers ============"
+    FOR i FROM 3 TO LENGTH(sortedCustomers) - 1:
+        SET num = i + 1
+        PRINT num + ". " + UPPER(sortedCustomers[i].customer) + " -----------------> TOTAL AMOUNT: " + sortedCustomers[i].amount
+    END FOR
+    RETURN
+END FUNCTION
+
+//if user want all data include search data customer (optional)
+FUNCTION getAllDataOrderAnalysis(orders, name = null):
+    
+    SET n = LENGTH(orders)
+    IF n == 0 THEN
+        PRINT "============== NO DATA =============="
+    ELSE IF name == null
+        getPrintData(orders)
+    ELSE
+        getPrintData(orders)
+        PRINT ""
+        PRINT ""
+        findOrdersByCustomer(orders, name)
+    END IF
+    RETURN 
+END FUNCTION
+
+getAllDataOrderAnalysis(orders,"aisha")
