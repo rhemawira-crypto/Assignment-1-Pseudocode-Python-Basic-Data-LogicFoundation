@@ -1,0 +1,268 @@
+# Online Store Order Analysis
+# Building a small Order Analysis System for an online store.
+# The backend receives a list of orders and must return a summary report.
+
+orders = [
+    {"customer": "Aisha", "product": "Keyboard",   "amount": 250,  "category": "Electronics"},
+    {"customer": "Budi",  "product": "Notebook",   "amount": 35,   "category": "Stationery"},
+    {"customer": "Aisha", "product": "Mouse",      "amount": 90,   "category": "Electronics"},
+    {"customer": "Citra", "product": "Monitor",    "amount": 1200, "category": "Electronics"},
+    {"customer": "Budi",  "product": "Pen Set",    "amount": 15,   "category": "Stationery"},
+    {"customer": "Dewi",  "product": "Desk Lamp",  "amount": 75,   "category": "Home"},
+    {"customer": "Citra", "product": "Chair",      "amount": 320,  "category": "Home"},
+    {"customer": "Aisha", "product": "USB Cable",  "amount": 20,   "category": "Electronics"},
+    {"customer": "Eko",   "product": "Marker",     "amount": 8,    "category": "Stationery"},
+    {"customer": "Dewi",  "product": "Headphones", "amount": 180,  "category": "Electronics"},
+]
+
+
+# filter - Produce a list of all orders with amount >= 50, significant or unsignificant.
+def filter_product_by_amount(orders, threshold=50):
+    significant_results = []
+    unsignificant_results = []
+
+    for order in orders:
+        if order["amount"] >= threshold:
+            significant_results.append(order)
+        else:
+            unsignificant_results.append(order)
+
+    return {
+        "significantOrders": significant_results,
+        "unsignificantOrders": unsignificant_results,
+    }
+
+
+# revenue summary - aggregate (total, average amount, highest and lowest)
+def get_data_aggregate_orders(orders):
+    n = len(orders)
+
+    # sum total revenue
+    total = 0
+    for order in orders:
+        total = total + order["amount"]
+
+    # calculate average of order amount
+    average = total / n
+    average = round(average, 2)
+
+    # search max and min value
+    max_value = orders[0]["amount"]
+    max_product = None
+    min_value = orders[0]["amount"]
+    min_product = None
+
+    for order in orders:
+        if order["amount"] > max_value:
+            max_value = order["amount"]
+            max_product = order["product"]
+
+    for order in orders:
+        if order["amount"] < min_value:
+            min_value = order["amount"]
+            min_product = order["product"]
+
+    return {
+        "totalRevenue": total,
+        "averagerOrderAmount": average,
+        "highestOrderAmount": max_value,
+        "lowestOrderAmount": min_value,
+        "productHighestOrders": max_product,
+        "productLowestOrders": min_product,
+    }
+
+
+# group & count - per category
+def get_data_group_by_category(orders):
+    groups = {}
+    counts = {}
+
+    # iteration for grouping by category and counting
+    for order in orders:
+        if order["category"] not in groups:
+            groups[order["category"]] = []
+            counts[order["category"]] = 1
+        else:
+            groups[order["category"]].append(order)
+            counts[order["category"]] = counts[order["category"]] + 1
+
+    # iteration for summary of total revenue each category
+    total_revenue_each_category = {}
+    for item in groups:
+        total = 0
+        group = groups[item]
+        for i in range(0, len(group)):
+            total = total + group[i]["amount"]
+        total_revenue_each_category[item] = total
+
+    return {
+        "groups": groups,
+        "counts": counts,
+        "total": total_revenue_each_category,
+    }
+
+
+# function for customer lookup - search
+def find_orders_by_customer(orders, name):
+    results = []
+    target = name.lower()
+
+    # search target
+    for order in orders:
+        if target == order["customer"].lower():
+            results.append(order)
+
+    # print result
+    if len(results) == 0:
+        print("============ DATA CUSTOMER ============")
+        print("-------------- Not Found --------------")
+    else:
+        print("============ DATA CUSTOMER ============")
+        print("------------- ORDER FOUND -------------")
+        print("")
+        print("------ Here yours data for " + target.upper() + " ------")
+        total = 0
+        for item in results:
+            total = total + item["amount"]
+            print("- Order: " + item["product"] + " (" + item["category"] + ") -> Amount : " + str(item["amount"]))
+        print("")
+        print("------ TOTAL ORDERS AMOUNT : " + str(total) + " ------")
+    return
+
+
+# selection sorting, descending is default
+def selection_sorting(orders, descending=True):
+    n = len(orders)
+    for i in range(0, n - 1):
+        target_index = i
+        for j in range(i + 1, n):
+            if descending:
+                if orders[j]["amount"] > orders[target_index]["amount"]:
+                    target_index = j
+            else:
+                if orders[j]["amount"] < orders[target_index]["amount"]:
+                    target_index = j
+        if target_index != i:
+            temp = orders[i]
+            orders[i] = orders[target_index]
+            orders[target_index] = temp
+    return orders
+
+
+# Top customers — sort. Include total amount spent by each customers, sort from highest to lowest
+def get_top_customers(orders):
+    # grouping and count the total amount spent by each customers
+    groups = {}
+    for order in orders:
+        name_customer = order["customer"]
+        if name_customer in groups:
+            groups[name_customer] = groups[name_customer] + order["amount"]
+        else:
+            groups[name_customer] = order["amount"]
+
+    # turn from dictionary into list
+    list_customers = []
+    for item in groups:
+        amount = groups[item]
+        list_customers.append({"customer": item, "amount": amount})
+
+    # sorting the list with selection-sorting's function
+    sorted_list_customers = selection_sorting(list_customers)
+    return sorted_list_customers
+
+
+# Combine & report. This function help to get all data of order analysis
+def get_print_data(orders):
+    filtered = filter_product_by_amount(orders)
+    significant_results = filtered["significantOrders"]
+    unsignificant_results = filtered["unsignificantOrders"]
+
+    if len(significant_results) == 0:
+        print("========== !!ATTENTION!! ============")
+        print("----  All orders under threshold ----")
+        num = 0
+        for item in unsignificant_results:
+            num = num + 1
+            print(str(num) + ". " + item["customer"] + " -> Product: " + item["product"] +
+                  " | Category: " + item["category"] + " --> Amount: " + str(item["amount"]))
+    else:
+        print("========= Significant Orders ===========")
+        print("--------- Filtered List Orders ---------")
+        num = 0
+        for item in significant_results:
+            num = num + 1
+            print(str(num) + ". " + item["customer"] + " -> Product: " + item["product"] +
+                  " | Category: " + item["category"] + " --> Amount: " + str(item["amount"]))
+
+    print("")
+    print("")
+
+    data_aggregate = get_data_aggregate_orders(orders)
+    total_revenue = data_aggregate["totalRevenue"]
+    averager_amount = data_aggregate["averagerOrderAmount"]
+    highest_amount = data_aggregate["highestOrderAmount"]
+    lowest_amount = data_aggregate["lowestOrderAmount"]
+    product_highest = data_aggregate["productHighestOrders"]
+    product_lowest = data_aggregate["productLowestOrders"]
+
+    print("========= REVENUE SUMMARY ===========")
+    print("")
+    print("Total Revenue: " + str(total_revenue))
+    print("Average Order Amount: " + str(averager_amount))
+    print("Highest Order Amounts: " + str(highest_amount) + " ---> Products: " + str(product_highest))
+    print("Lowest Order Amounts: " + str(lowest_amount) + " ---> Products: " + str(product_lowest))
+
+    print("")
+    print("")
+
+    data_group_by_category = get_data_group_by_category(orders)
+    groups_by_category = data_group_by_category["groups"]
+    counts_each_category = data_group_by_category["counts"]
+    total_revenue_each_category = data_group_by_category["total"]
+
+    print("===== DATA ORDERS PER CATEGORY =====")
+    print("")
+    num = 0
+    for item in groups_by_category:
+        total_amount = total_revenue_each_category[item]
+        counts_category = counts_each_category[item]
+        num = num + 1
+        print(str(num) + ". " + item + " -> Total Orders: " + str(counts_category) +
+              " | Total Revenue: " + str(total_amount))
+
+    print("")
+    print("")
+
+    sorted_customers = get_top_customers(orders)
+    print("============== TOP CUSTOMERS ==============")
+    print("")
+    icon_ranks = ["🥇", "🥈", "🥉"]
+    for i in range(0, 3):
+        num = i + 1
+        print("---- RANK " + str(num) + " - " + sorted_customers[i]["customer"].upper() +
+              " " + icon_ranks[i] + " -> TOTAL AMOUNT: " + str(sorted_customers[i]["amount"]))
+    print("--------------------------------------------")
+    print("========== Sorted LIST Customers ============")
+    for i in range(3, len(sorted_customers)):
+        num = i + 1
+        print(str(num) + ". " + sorted_customers[i]["customer"].upper() +
+              " -----------------> TOTAL AMOUNT: " + str(sorted_customers[i]["amount"]))
+    return
+
+
+# if user want all data include search data customer (optional)
+def get_all_data_order_analysis(orders, name=None):
+    n = len(orders)
+    if n == 0:
+        print("============== NO DATA ==============")
+    elif name is None:
+        get_print_data(orders)
+    else:
+        get_print_data(orders)
+        print("")
+        print("")
+        find_orders_by_customer(orders, name)
+    return
+
+
+get_all_data_order_analysis(orders, "aisha")
